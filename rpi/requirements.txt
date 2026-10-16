@@ -1,3 +1,3 @@
-dht11==0.0.109
+dht11>=0.1.0
 gpiozero>=2.0
-paho-mqtt==1.6.1
+paho-mqtt>=1.6.0
