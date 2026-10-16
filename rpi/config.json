@@ -1,0 +1,10 @@
+{
+  "device_name": "raspberrypi",
+  "mqtt_host": "localhost",
+  "mqtt_port": 1883,
+  "mqtt_user": null,
+  "mqtt_password": null,
+  "publish_interval": 10,
+  "temp_threshold": 0.5,
+  "distance_threshold": 3
+}

@@ -1,0 +1,21 @@
+[Unit]
+Description=Sensor Publisher (DHT22 + HC-SR04)
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/sensor-hub/rpi
+ExecStart=/usr/bin/python3 /home/pi/sensor-hub/rpi/publisher.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# 리소스 제한
+MemoryLimit=256M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

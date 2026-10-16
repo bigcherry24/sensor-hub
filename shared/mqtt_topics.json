@@ -1,0 +1,35 @@
+{
+  "description": "MQTT 토픽 정의 (라즈베리파이 퍼블리셔 + 서버 수집기 공유)",
+  "base": "home/{device}",
+  "topics": {
+    "status": "home/{device}/status",
+    "sensor": {
+      "temperature": "home/{device}/sensor/temperature",
+      "humidity": "home/{device}/sensor/humidity",
+      "distance": "home/{device}/sensor/distance"
+    },
+    "alert": {
+      "summary": "home/{device}/alert/summary",
+      "emergency": "home/{device}/alert/emergency"
+    }
+  },
+  "message_format": {
+    "sensor_reading": {
+      "device": "string (예: raspberrypi)",
+      "sensor": "string (temperature|humidity|distance)",
+      "value": "float",
+      "unit": "string (°C|%|cm)",
+      "ts": "string (ISO8601 UTC, 예: 2026-10-17T06:49:00Z)"
+    },
+    "status": {
+      "device": "string",
+      "status": "string (online|offline)",
+      "ts": "string (ISO8601 UTC)"
+    }
+  },
+  "subscription_patterns": {
+    "collector": "home/+/sensor/#",
+    "bridge": "home/+/sensor/#",
+    "all_devices": "home/+/sensor/#"
+  }
+}

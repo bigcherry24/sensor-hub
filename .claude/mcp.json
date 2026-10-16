@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "weather-api": {
+      "command": "python",
+      "args": ["/home/aurakim/workspace/weather-mcp/server.py"],
+      "env": {
+        "ACC_TOKEN": "1234"
+      }
+    }
+  }
+}
