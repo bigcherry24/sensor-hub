@@ -1,0 +1,29 @@
+# Python venv
+rpi/venv/
+server/venv/
+*.pyc
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 데이터
+*.db
+*.log
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 프로젝트 specific
+rpi/.claude/settings.local.json
+server/collector/sensor_data.db
