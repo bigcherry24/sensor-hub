@@ -15,6 +15,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import board
 import paho.mqtt.client as mqtt
 
 from sensors.dht import DHT11Reader
@@ -56,8 +57,8 @@ class SensorPublisher:
         self.last_publish_time = 0
 
         # 센서 초기화
-        self.dht = DHT11Reader(gpio_pin=4)  # GPIO 4
-        self.distance = HC_SR04Reader(trig_pin=17, echo_pin=27)  # GPIO 17, 27
+        self.dht = DHT11Reader(gpio_pin=board.D4)  # GPIO 4 (Blinka Pin 객체)
+        self.distance = HC_SR04Reader(trig_pin=17, echo_pin=27)  # GPIO 17, 27 (정수)
 
         # MQTT 클라이언트
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
