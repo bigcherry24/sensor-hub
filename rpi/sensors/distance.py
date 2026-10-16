@@ -1,15 +1,15 @@
 import logging
 import time
-import RPi.GPIO as GPIO
+from gpiozero import DistanceSensor
 
 logger = logging.getLogger(__name__)
 
 
 class HC_SR04Reader:
-    """HC-SR04 초음파 거리 센서
+    """HC-SR04 초음파 거리 센서 (gpiozero 사용)
 
-    - TRIG: GPIO 17 (신호 송신, 10μs 펄스)
-    - ECHO: GPIO 27 (신호 수신, 반향 시간 측정)
+    - TRIG: GPIO 17 (신호 송신)
+    - ECHO: GPIO 27 (신호 수신)
     - 5회 측정 후 중간값 사용 (노이즈 제거)
     """
 
@@ -18,59 +18,15 @@ class HC_SR04Reader:
         self.echo_pin = echo_pin
         self.samples = samples
         self.timeout = timeout
-        self.sound_speed = 34300  # cm/s (25°C 기준)
 
-        # GPIO 설정 (BCM 모드)
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
-        GPIO.setup(self.trig_pin, GPIO.OUT)
-        GPIO.setup(self.echo_pin, GPIO.IN)
-
-        # TRIG 초기값 LOW
-        GPIO.output(self.trig_pin, GPIO.LOW)
-        time.sleep(0.5)
-
-        logger.info(f"HC-SR04 센서 초기화 완료 (TRIG={trig_pin}, ECHO={echo_pin})")
-
-    def _single_read(self):
-        """한 번의 거리 측정
-
-        Returns:
-            float: 거리 (cm), 실패 시 None
-        """
         try:
-            # TRIG 10μs 펄스 송신
-            GPIO.output(self.trig_pin, GPIO.HIGH)
-            time.sleep(0.00001)  # 10μs
-            GPIO.output(self.trig_pin, GPIO.LOW)
-
-            # ECHO 시작 시간 대기 (최대 timeout)
-            start_time = time.time()
-            while GPIO.input(self.echo_pin) == GPIO.LOW:
-                if time.time() - start_time > self.timeout:
-                    logger.warning("HC-SR04: ECHO 신호 수신 타임아웃 (LOW → HIGH)")
-                    return None
-
-            pulse_start = time.time()
-
-            # ECHO 종료 시간 대기
-            start_time = time.time()
-            while GPIO.input(self.echo_pin) == GPIO.HIGH:
-                if time.time() - start_time > self.timeout:
-                    logger.warning("HC-SR04: ECHO 신호 수신 타임아웃 (HIGH → LOW)")
-                    return None
-
-            pulse_end = time.time()
-
-            # 거리 계산: distance = (time * speed) / 2
-            pulse_duration = pulse_end - pulse_start
-            distance = (pulse_duration * self.sound_speed) / 2
-
-            return distance
-
+            # gpiozero DistanceSensor 생성
+            # (echo_pin, trigger_pin 순서)
+            self.sensor = DistanceSensor(echo=echo_pin, trigger=trig_pin, queue_len=1)
+            logger.info(f"HC-SR04 센서 초기화 완료 (TRIG={trig_pin}, ECHO={echo_pin})")
         except Exception as e:
-            logger.error(f"HC-SR04 단일 측정 오류: {e}")
-            return None
+            logger.error(f"HC-SR04 센서 초기화 실패: {e}")
+            raise
 
     def read(self):
         """거리 읽기 (중간값 필터)
@@ -81,9 +37,15 @@ class HC_SR04Reader:
         measurements = []
 
         for i in range(self.samples):
-            distance = self._single_read()
-            if distance is not None:
-                measurements.append(distance)
+            try:
+                # gpiozero는 거리를 미터(m)로 반환
+                distance_m = self.sensor.distance
+                if distance_m is not None and distance_m > 0:
+                    distance_cm = distance_m * 100  # m → cm
+                    measurements.append(distance_cm)
+            except Exception as e:
+                logger.warning(f"HC-SR04 읽기 시도 {i+1}/{self.samples} 실패: {e}")
+
             time.sleep(0.1)  # 측정 간 대기
 
         if not measurements:
@@ -94,13 +56,13 @@ class HC_SR04Reader:
         measurements.sort()
         median = measurements[len(measurements) // 2]
 
-        logger.debug(f"HC-SR04: 측정값={measurements}, 중간값={median:.1f}cm")
+        logger.debug(f"HC-SR04: 측정값={[f'{m:.1f}' for m in measurements]}, 중간값={median:.1f}cm")
         return median
 
     def close(self):
-        """GPIO 리소스 해제"""
+        """센서 리소스 해제"""
         try:
-            GPIO.cleanup()
-            logger.info("HC-SR04 센서 종료 (GPIO 정리 완료)")
+            self.sensor.close()
+            logger.info("HC-SR04 센서 종료")
         except Exception as e:
             logger.warning(f"HC-SR04 센서 종료 중 오류: {e}")
