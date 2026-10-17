@@ -6,13 +6,14 @@ metadata:
 
 graph:
   nodes:
-    - id: "start"
-      type: "start"
-      title: "시작"
+    - id: "webhook_trigger"
+      type: "webhook_trigger"
+      title: "Bridge HTTP 수신"
       position:
         x: 100
         y: 100
       data:
+        method: "POST"
         variables:
           - variable: "period"
             type: "string"
@@ -214,7 +215,7 @@ graph:
               type: "string"
 
   edges:
-    - source: "start"
+    - source: "webhook_trigger"
       target: "code_format_alert"
     - source: "code_format_alert"
       target: "llm_alert"

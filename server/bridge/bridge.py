@@ -44,10 +44,9 @@ class SensorBridge:
     def __init__(self, config_file='bridge_config.json'):
         self.config = self._load_config(config_file)
 
-        # Dify 설정
-        self.dify_base = os.getenv('DIFY_BASE_URL', 'http://localhost:5000')
-        self.dify_summary_key = os.getenv('DIFY_SUMMARY_API_KEY')
-        self.dify_alert_key = os.getenv('DIFY_ALERT_API_KEY')
+        # Dify Webhook URL 설정
+        self.webhook_summary = os.getenv('DIFY_WEBHOOK_SUMMARY')
+        self.webhook_alert = os.getenv('DIFY_WEBHOOK_ALERT')
 
         # 임계치
         self.temp_change_threshold = self.config['temp_change_threshold']  # °C
@@ -59,10 +58,7 @@ class SensorBridge:
         db_path = self.config.get('db_path', '../collector/sensor_data.db')
         self.db = SensorDB(db_path)
 
-        # 마지막 발송 기록 (재발송 방지)
-        self.last_sent = {}
-
-        logger.info(f"SensorBridge 초기화: {self.dify_base}")
+        logger.info(f"SensorBridge 초기화 (Webhook 모드)")
 
     def _load_config(self, config_file):
         """설정 파일 로드"""
@@ -127,62 +123,50 @@ class SensorBridge:
 
         return False
 
-    def call_dify_workflow(self, aggregations, is_alert=False):
-        """Dify Workflow API 호출
+    def call_dify_webhook(self, aggregations, is_alert=False):
+        """Dify Webhook으로 데이터 전송
 
         Args:
             aggregations: 최근 1분 집계 리스트
             is_alert: True면 긴급 알림 워크플로우
         """
         try:
-            # API 키 선택
-            api_key = self.dify_alert_key if is_alert else self.dify_summary_key
-            workflow_name = 'alert-workflow' if is_alert else 'summary-workflow'
+            # Webhook URL 선택
+            webhook_url = self.webhook_alert if is_alert else self.webhook_summary
+            workflow_name = 'alert' if is_alert else 'summary'
 
-            if not api_key:
-                logger.error(f"Dify API 키 없음: {workflow_name}")
+            if not webhook_url:
+                logger.error(f"Dify Webhook URL 없음: {workflow_name}")
                 return None
 
             # 현재 시간 (분 단위)
             now = datetime.now(timezone.utc)
             period_str = now.strftime('%Y-%m-%d %H:%M')
 
-            # Payload 구성
+            # Payload 구성 (Webhook이 기대하는 형식)
             payload = {
-                'inputs': {
-                    'period': period_str,
-                    'events': aggregations,
-                    'alert_type': 'emergency' if is_alert else 'summary'
-                },
-                'response_mode': 'blocking',
-                'user': 'sensor-bridge'
+                'period': period_str,
+                'events': aggregations,
+                'alert_type': 'emergency' if is_alert else 'summary'
             }
 
-            # Dify API 호출
-            url = f"{self.dify_base}/v1/workflows/run"
-            headers = {
-                'Authorization': f'Bearer {api_key}',
-                'Content-Type': 'application/json'
-            }
-
-            logger.info(f"Dify 호출: {workflow_name} ({period_str})")
+            logger.info(f"Dify Webhook 호출: {workflow_name} ({period_str})")
             logger.debug(f"Payload: {json.dumps(payload, indent=2)}")
 
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            response = requests.post(webhook_url, json=payload, timeout=30)
 
             if response.status_code == 200:
-                result = response.json()
-                logger.info(f"✅ Dify 응답 성공")
-                return result
+                logger.info(f"✅ Webhook 응답 성공")
+                return response.json()
             else:
-                logger.error(f"❌ Dify 응답 실패: {response.status_code} - {response.text}")
+                logger.error(f"❌ Webhook 응답 실패: {response.status_code} - {response.text}")
                 return None
 
         except requests.exceptions.Timeout:
-            logger.error(f"Dify 요청 타임아웃")
+            logger.error(f"Webhook 요청 타임아웃")
             return None
         except Exception as e:
-            logger.error(f"Dify 호출 실패: {e}")
+            logger.error(f"Webhook 호출 실패: {e}")
             return None
 
     def process_minute(self):
@@ -232,12 +216,12 @@ class SensorBridge:
             # 경보 발송 (우선순위)
             if alert_aggs:
                 logger.warning(f"🚨 경보 발송: {len(alert_aggs)}개 센서")
-                self.call_dify_workflow(alert_aggs, is_alert=True)
+                self.call_dify_webhook(alert_aggs, is_alert=True)
 
             # 요약 발송
             if summary_aggs:
                 logger.info(f"📨 요약 발송: {len(summary_aggs)}개 센서")
-                self.call_dify_workflow(summary_aggs, is_alert=False)
+                self.call_dify_webhook(summary_aggs, is_alert=False)
 
             logger.info("브리지 1분 처리 완료")
             logger.info("=" * 60)

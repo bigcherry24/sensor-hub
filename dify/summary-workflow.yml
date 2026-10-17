@@ -6,13 +6,14 @@ metadata:
 
 graph:
   nodes:
-    - id: "start"
-      type: "start"
-      title: "시작"
+    - id: "webhook_trigger"
+      type: "webhook_trigger"
+      title: "Bridge HTTP 수신"
       position:
         x: 100
         y: 100
       data:
+        method: "POST"
         variables:
           - variable: "period"
             type: "string"
@@ -25,7 +26,7 @@ graph:
           - variable: "alert_type"
             type: "string"
             required: false
-            description: "경보 타입 (summary|emergency)"
+            description: "경보 타입 (summary)"
 
     - id: "code_validate"
       type: "code"
@@ -205,7 +206,7 @@ graph:
               type: "number"
 
   edges:
-    - source: "start"
+    - source: "webhook_trigger"
       target: "code_validate"
     - source: "code_validate"
       target: "llm_summary"

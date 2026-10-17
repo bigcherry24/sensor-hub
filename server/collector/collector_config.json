@@ -1,5 +1,5 @@
 {
-  "mqtt_host": "localhost",
+  "mqtt_host": "192.168.0.71",
   "mqtt_port": 1883,
   "mqtt_user": "collector",
   "mqtt_password": "collector456",
