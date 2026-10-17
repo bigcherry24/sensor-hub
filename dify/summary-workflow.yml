@@ -37,12 +37,18 @@ graph:
         language: "python3"
         code: |
           # 입력 데이터 검증 및 포맷팅
+          # events는 {'items': [...], 'count': N, 'timestamp': '...'} 형식
           import json
-          from datetime import datetime
+
+          # events 객체에서 배열 추출
+          if isinstance(events, dict) and 'items' in events:
+              aggregations = events['items']
+          else:
+              aggregations = events if isinstance(events, list) else []
 
           validated_events = []
 
-          for event in events:
+          for event in aggregations:
               if isinstance(event, dict):
                   validated_events.append({
                       'device': event.get('device', 'unknown'),

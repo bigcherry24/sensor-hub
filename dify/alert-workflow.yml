@@ -37,20 +37,27 @@ graph:
         language: "python3"
         code: |
           # 경보 메시지 포맷팅
-          import json
+          # events는 {'items': [...], 'count': N, 'timestamp': '...'} 형식
           from datetime import datetime
+
+          # events 객체에서 배열 추출
+          if isinstance(events, dict) and 'items' in events:
+              aggregations = events['items']
+          else:
+              aggregations = events if isinstance(events, list) else []
 
           alert_details = []
 
-          for event in events:
-              detail = {
-                  'device': event.get('device'),
-                  'sensor': event.get('sensor'),
-                  'max': float(event.get('max', 0)),
-                  'threshold': 30.0 if event.get('sensor') == 'temperature' else 5.0,
-                  'unit': '°C' if event.get('sensor') == 'temperature' else 'cm'
-              }
-              alert_details.append(detail)
+          for event in aggregations:
+              if isinstance(event, dict):
+                  detail = {
+                      'device': event.get('device'),
+                      'sensor': event.get('sensor'),
+                      'max': float(event.get('max', 0)),
+                      'threshold': 30.0 if event.get('sensor') == 'temperature' else 5.0,
+                      'unit': '°C' if event.get('sensor') == 'temperature' else 'cm'
+                  }
+                  alert_details.append(detail)
 
           # 경보 텍스트 생성
           alert_text = "🚨 센서 경보 발생!\n\n"

@@ -65,24 +65,30 @@ SMTP 서버: smtp.gmail.com
 | 변수명 | 타입 | 필수 | 설명 | 입력 방식 |
 |---|---|---|---|---|
 | period | String | Yes | 시간 (예: 2026-10-17 17:35) | 텍스트 입력 |
-| events | Object | Yes | 센서 집계 데이터 배열 | **JSON code field** |
+| events | Object | Yes | 센서 집계 데이터 객체 | **JSON code field** |
 | alert_type | String | No | 경보 타입 (summary/emergency) | 텍스트 입력 |
 
 **주의:** `events`는 Object 타입이므로 **JSON code input field**로 나타납니다.
-Bridge.py에서 JSON 배열 형식으로 전송합니다:
+Bridge.py에서 다음 형식으로 전송합니다:
 ```json
-[
-  {
-    "device": "raspberrypi",
-    "sensor": "temperature",
-    "min": 24.1,
-    "max": 24.8,
-    "avg": 24.5,
-    "change_count": 2,
-    "sample_count": 10
-  }
-]
+{
+  "items": [
+    {
+      "device": "raspberrypi",
+      "sensor": "temperature",
+      "min": 24.1,
+      "max": 24.8,
+      "avg": 24.5,
+      "change_count": 2,
+      "sample_count": 10
+    }
+  ],
+  "count": 1,
+  "timestamp": "2026-10-17 13:46"
+}
 ```
+
+Dify의 Code 노드에서 `events['items']`로 배열에 접근합니다.
 
 ### 1-3. 노드 추가
 

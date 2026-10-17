@@ -145,10 +145,17 @@ class SensorBridge:
             period_str = now.strftime('%Y-%m-%d %H:%M')
 
             # Payload 구성 (Start 노드의 inputs 필드)
+            # events를 dict로 변환 (Dify User Input의 Object 형식 지원)
+            events_dict = {
+                'items': aggregations,
+                'count': len(aggregations),
+                'timestamp': period_str
+            }
+
             payload = {
                 'inputs': {
                     'period': period_str,
-                    'events': aggregations,
+                    'events': events_dict,
                     'alert_type': 'emergency' if is_alert else 'summary'
                 },
                 'response_mode': 'blocking',
@@ -163,7 +170,7 @@ class SensorBridge:
             }
 
             logger.info(f"Dify 호출: {workflow_name} ({period_str})")
-            logger.debug(f"Payload: {json.dumps(payload, indent=2)}")
+            logger.info(f"📤 Payload 전문:\n{json.dumps(payload, indent=2, default=str)}")
 
             response = requests.post(url, json=payload, headers=headers, timeout=30)
 
