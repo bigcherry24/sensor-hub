@@ -13,7 +13,7 @@ import time
 import signal
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from collections import defaultdict
 
@@ -171,14 +171,14 @@ class SensorCollector:
         else:
             if self.last_values[key] != value:
                 # 변화 횟수 증가
-                minute_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:00')
+                minute_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:00')
                 agg_key = (device, sensor, minute_str)
                 self.minute_change_count[agg_key] += 1
                 self.last_values[key] = value
 
     def calculate_and_save_aggregations(self):
         """1분 집계 계산 및 저장"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         current_minute = now.strftime('%Y-%m-%d %H:%M:00')
 
         # 지난 분의 데이터만 집계 (현재 분은 진행 중)
