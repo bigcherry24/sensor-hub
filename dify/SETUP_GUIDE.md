@@ -58,28 +58,15 @@ SMTP 서버: smtp.gmail.com
 5. "Create" 클릭
 ```
 
-### 1-2. Webhook Trigger 노드 설정 (중요!)
+### 1-2. 입력 변수 설정
 
-**Start 노드 대신 Webhook Trigger 노드를 사용합니다.**
-Bridge.py가 HTTP POST로 데이터를 전송하므로 Webhook에서 수신해야 합니다.
-
-**Webhook Trigger 노드 추가:**
-```
-1. 노드 추가 → "Trigger" → "Webhook"
-2. 메소드: POST
-3. Variables 추가 (아래 표)
-```
+**Start 노드 클릭 → Variables 추가:**
 
 | 변수명 | 타입 | 필수 | 설명 |
 |---|---|---|---|
 | period | String | Yes | 시간 (예: 2026-10-17 17:35) |
 | events | Array[Object] | Yes | 센서 집계 배열 |
 | alert_type | String | No | 경보 타입 |
-
-**Webhook URL 복사 (나중에 bridge.py에 사용)**
-```
-예: https://your-dify-server/api/webhooks/sensors/summary
-```
 
 ### 1-3. 노드 추가
 
@@ -229,16 +216,12 @@ SMTP_SERVER_URL: (선택)
 EMAIL_RECIPIENT: (선택)
 ```
 
-### 1-6. Webhook URL 복사
+### 1-6. API 키 복사
 
 ```
-Webhook Trigger 노드 우클릭 → "Copy Webhook URL"
-예: https://your-dify-server/api/webhooks/sensors/summary
-
-이 URL을 bridge.py의 WEBHOOK_SUMMARY_URL로 설정합니다.
+"API" 탭 클릭 → "API Key" 복사
+예: app-5f8c9a2b1d4e6g9h2j3k4l5m
 ```
-
-**이전 방식 (API Key 기반)은 사용하지 않습니다.**
 
 ---
 
@@ -248,14 +231,11 @@ Webhook Trigger 노드 우클릭 → "Copy Webhook URL"
 
 **차이점:**
 - 앱 이름: "Sensor Alert"
-- **Webhook Trigger 사용** (Start 노드 아님)
 - Code 노드: 경보 포맷팅 (Red color)
 - LLM 프롬프트: 긴급 메시지
 - Slack: 빨간색 첨부 파일 (`"color": "#FF0000"`)
 - Telegram: 🚨 이모지
 - Email: `[긴급]` 제목 접두어
-
-**경고:** Start 노드가 아니라 **Webhook Trigger 노드로 시작**하세요!
 
 ---
 
@@ -275,64 +255,75 @@ dify/
 
 ## ✅ 테스트
 
-### Webhook URL 확인
+### API 키 확인
 
 ```bash
-# Sensor Summary Webhook URL
-WEBHOOK_SUMMARY="https://your-dify-server/api/webhooks/sensors/summary"
+# Sensor Summary API 키
+DIFY_SUMMARY_KEY="app-xxxxx"
 
-# Sensor Alert Webhook URL
-WEBHOOK_ALERT="https://your-dify-server/api/webhooks/sensors/alert"
+# Sensor Alert API 키
+DIFY_ALERT_KEY="app-yyyyy"
 ```
 
 ### 수동 테스트
 
 ```bash
-# Sensor Summary 호출 (정상 데이터)
-curl -X POST "https://your-dify-server/api/webhooks/sensors/summary" \
+# Sensor Summary 호출
+curl -X POST "http://your-dify-server:5000/v1/workflows/run" \
+  -H "Authorization: Bearer $DIFY_SUMMARY_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "period": "2026-10-17 17:35",
-    "events": [
-      {
-        "device": "raspberrypi",
-        "sensor": "temperature",
-        "min": 24.1,
-        "max": 24.8,
-        "avg": 24.5,
-        "change_count": 2,
-        "sample_count": 10
-      }
-    ],
-    "alert_type": "summary"
+    "inputs": {
+      "period": "2026-10-17 17:35",
+      "events": [
+        {
+          "device": "raspberrypi",
+          "sensor": "temperature",
+          "min": 24.1,
+          "max": 24.8,
+          "avg": 24.5,
+          "change_count": 2,
+          "sample_count": 10
+        }
+      ],
+      "alert_type": "summary"
+    },
+    "response_mode": "blocking",
+    "user": "sensor-bridge"
   }'
 
 # Sensor Alert 호출 (임계치 초과)
-curl -X POST "https://your-dify-server/api/webhooks/sensors/alert" \
+curl -X POST "http://your-dify-server:5000/v1/workflows/run" \
+  -H "Authorization: Bearer $DIFY_ALERT_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "period": "2026-10-17 17:35",
-    "events": [
-      {
-        "device": "raspberrypi",
-        "sensor": "temperature",
-        "min": 28.0,
-        "max": 32.5,
-        "avg": 30.5,
-        "change_count": 5,
-        "sample_count": 10
-      }
-    ],
-    "alert_type": "emergency"
+    "inputs": {
+      "period": "2026-10-17 17:35",
+      "events": [
+        {
+          "device": "raspberrypi",
+          "sensor": "temperature",
+          "min": 28.0,
+          "max": 32.5,
+          "avg": 30.5,
+          "change_count": 5,
+          "sample_count": 10
+        }
+      ],
+      "alert_type": "emergency"
+    },
+    "response_mode": "blocking",
+    "user": "sensor-bridge"
   }'
 ```
 
-### bridge.py에 Webhook URL 설정
+### bridge.py에 API 키 설정
 
 ```bash
 # server/bridge/.env 수정
-DIFY_WEBHOOK_SUMMARY=https://your-dify-server/api/webhooks/sensors/summary
-DIFY_WEBHOOK_ALERT=https://your-dify-server/api/webhooks/sensors/alert
+DIFY_BASE_URL=http://192.168.0.100:5000
+DIFY_SUMMARY_API_KEY=app-xxxxx
+DIFY_ALERT_API_KEY=app-yyyyy
 ```
 
 ---

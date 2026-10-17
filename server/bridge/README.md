@@ -40,11 +40,11 @@ cp .env.example .env
 nano .env
 ```
 
-설정 값 (Dify Webhook URL):
+설정 값:
 ```
-# Dify에서 워크플로우의 Webhook Trigger 노드 우클릭 → "Copy Webhook URL"
-DIFY_WEBHOOK_SUMMARY=https://your-dify-server/api/webhooks/sensors/summary
-DIFY_WEBHOOK_ALERT=https://your-dify-server/api/webhooks/sensors/alert
+DIFY_BASE_URL=http://192.168.0.100:5000
+DIFY_SUMMARY_API_KEY=<Dify 요약 워크플로우 API 키>
+DIFY_ALERT_API_KEY=<Dify 경보 워크플로우 API 키>
 ```
 
 ### 3. 설정 파일 수정
@@ -137,57 +137,44 @@ sudo systemctl start sensor-bridge.timer
 sudo systemctl status sensor-bridge.timer
 ```
 
-## Dify Webhook 구조
+## Dify 워크플로우
 
-### Bridge → Dify 통신
+### 요약 워크플로우 (summary-workflow)
 
-**Bridge.py는 Webhook으로 POST 요청을 전송합니다:**
-
-```
-bridge.py (매 1분)
-  ↓
-POST /api/webhooks/sensors/summary  (정상 데이터)
-POST /api/webhooks/sensors/alert    (경보 데이터)
-  ↓
-Dify Webhook Trigger 노드
-  ↓
-Code 검증 → LLM 생성 → Condition → HTTP(Slack/Telegram/Email)
-```
-
-### 요약 워크플로우 (Webhook Trigger)
-
-**받는 데이터:**
+**입력:**
 ```json
 {
-  "period": "2026-10-17 17:35",
-  "events": [
-    {
-      "device": "raspberrypi",
-      "sensor": "temperature",
-      "min": 24.1,
-      "max": 24.8,
-      "avg": 24.5,
-      "change_count": 2,
-      "sample_count": 10
-    }
-  ],
-  "alert_type": "summary"
+  "inputs": {
+    "period": "2026-10-17 17:35",
+    "events": [
+      {
+        "device": "raspberrypi",
+        "sensor": "temperature",
+        "min": 24.1,
+        "max": 24.8,
+        "avg": 24.5,
+        "change_count": 2,
+        "sample_count": 10
+      }
+    ],
+    "alert_type": "summary"
+  }
 }
 ```
 
 **처리:**
-1. Webhook Trigger: HTTP POST 수신
+1. Start 노드: inputs 필드에서 수신
 2. Code 노드: 수치 검증
 3. LLM 노드: "최근 1분 온도 변화: 24.1~24.8°C, 평균 24.5°C. 변동 2회."
 4. Condition: 이상 판정 (⚠️)
 5. HTTP 노드: Slack, Telegram, Email 발송
 
-### 경보 워크플로우 (Webhook Trigger)
+### 경보 워크플로우 (alert-workflow)
 
-**받는 데이터:** 동일 (alert_type = "emergency")
+**입력:** 동일 (alert_type = "emergency")
 
 **처리:**
-1. Webhook Trigger: HTTP POST 수신
+1. Start 노드: inputs 필드에서 수신
 2. 즉시 경보 포맷팅
 3. 모든 채널 동시 발송 (🚨)
 
@@ -214,18 +201,16 @@ ERROR: Dify 호출 실패: Connection refused
 curl http://192.168.0.100:5000/api/status
 ```
 
-### Webhook URL 오류
+### API 키 오류
 
 ```
-ERROR: Dify Webhook URL 없음
+ERROR: Dify API 키 없음
 ```
 
-→ .env 파일에 Webhook URL이 설정되어 있는지 확인:
+→ .env 파일에 API 키가 설정되어 있는지 확인:
 ```bash
-cat .env | grep DIFY_WEBHOOK
+cat .env | grep DIFY_
 ```
-
-→ Dify 워크플로우에서 Webhook Trigger 노드의 URL을 복사했는지 확인
 
 ### DB 파일 없음
 
