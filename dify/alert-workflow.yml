@@ -35,16 +35,31 @@ graph:
         y: 100
       data:
         language: "python3"
+        input_variables:
+          - variable: "period"
+            required: true
+          - variable: "events"
+            required: true
+          - variable: "alert_type"
+            required: true
         code: |
           # 경보 메시지 포맷팅
-          # events는 {'items': [...], 'count': N, 'timestamp': '...'} 형식
           from datetime import datetime
 
+          # 변수 추출 (여러 방식 지원)
+          events_input = locals().get('events') or globals().get('events')
+
+          if events_input is None:
+              # events를 찾지 못했으면 기본값 설정
+              events_input = {'items': [], 'count': 0, 'timestamp': ''}
+
           # events 객체에서 배열 추출
-          if isinstance(events, dict) and 'items' in events:
-              aggregations = events['items']
+          if isinstance(events_input, dict) and 'items' in events_input:
+              aggregations = events_input['items']
+          elif isinstance(events_input, list):
+              aggregations = events_input
           else:
-              aggregations = events if isinstance(events, list) else []
+              aggregations = []
 
           alert_details = []
 

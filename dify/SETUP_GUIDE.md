@@ -96,7 +96,13 @@ Dify의 Code 노드에서 `events['items']`로 배열에 접근합니다.
 ```
 타입: Code
 언어: Python 3
-코드: (아래 붙여넣기)
+```
+
+**Input Variables 추가 (중요!):**
+```
+- period (String, 필수)
+- events (Object, 필수)
+- alert_type (String, 선택)
 ```
 
 **Python 코드:**
