@@ -1,0 +1,7 @@
+{
+  "db_path": "../collector/sensor_data.db",
+  "temp_change_threshold": 0.5,
+  "distance_change_threshold": 3.0,
+  "temp_alert_threshold": 30.0,
+  "distance_alert_threshold": 5.0
+}
