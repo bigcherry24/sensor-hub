@@ -1,0 +1,243 @@
+version: "0.1"
+kind: "workflow"
+metadata:
+  name: "Sensor Summary"
+  description: "1분 센서 데이터 요약 및 알림 발송"
+
+graph:
+  nodes:
+    - id: "start"
+      type: "start"
+      title: "시작"
+      position:
+        x: 100
+        y: 100
+      data:
+        variables:
+          - variable: "period"
+            type: "string"
+            required: true
+            description: "시간 (예: 2026-10-17 17:35)"
+          - variable: "events"
+            type: "object"
+            required: true
+            description: "센서 집계 데이터 배열"
+          - variable: "alert_type"
+            type: "string"
+            required: false
+            description: "경보 타입 (summary|emergency)"
+
+    - id: "code_validate"
+      type: "code"
+      title: "데이터 검증"
+      position:
+        x: 300
+        y: 100
+      data:
+        language: "python3"
+        code: |
+          # 입력 데이터 검증 및 포맷팅
+          import json
+          from datetime import datetime
+
+          validated_events = []
+
+          for event in events:
+              if isinstance(event, dict):
+                  validated_events.append({
+                      'device': event.get('device', 'unknown'),
+                      'sensor': event.get('sensor', 'unknown'),
+                      'min': float(event.get('min', 0)),
+                      'max': float(event.get('max', 0)),
+                      'avg': float(event.get('avg', 0)),
+                      'change_count': int(event.get('change_count', 0)),
+                      'sample_count': int(event.get('sample_count', 0))
+                  })
+
+          # 센서 요약 생성
+          summary_text = ""
+          for event in validated_events:
+              summary_text += f"{event['device']}/{event['sensor']}: "
+              summary_text += f"min={event['min']:.1f}, max={event['max']:.1f}, "
+              summary_text += f"avg={event['avg']:.1f}, changes={event['change_count']}\n"
+
+          result = {
+              'validated': True,
+              'event_count': len(validated_events),
+              'summary_text': summary_text,
+              'events': validated_events
+          }
+
+    - id: "llm_summary"
+      type: "llm"
+      title: "LLM 요약 생성"
+      position:
+        x: 500
+        y: 100
+      data:
+        model: "gpt-4"
+        temperature: 0.7
+        max_tokens: 500
+        system_prompt: |
+          당신은 센서 데이터 분석가입니다.
+          라즈베리파이의 온도, 습도, 거리 센서 데이터를 분석하고 요약합니다.
+          요약은 3줄 이내로 작성합니다.
+          이상 징후가 있으면 맨 앞에 ⚠️ 표시합니다.
+        prompt: |
+          다음 센서 데이터를 분석하고 3줄로 요약하세요:
+
+          시간: {{period}}
+          데이터:
+          {{code_validate.summary_text}}
+
+          요약 형식:
+          - 온도/습도: [변화 요약]
+          - 거리: [변화 요약]
+          - 비고: [특이사항 또는 정상]
+
+    - id: "condition_alert"
+      type: "condition"
+      title: "이상 판정"
+      position:
+        x: 700
+        y: 100
+      data:
+        conditions:
+          - variable: "llm_summary"
+            comparator: "contains"
+            value: "⚠️"
+            logic: "and"
+
+    - id: "http_slack_summary"
+      type: "http_request"
+      title: "Slack 발송"
+      position:
+        x: 400
+        y: 250
+      data:
+        method: "POST"
+        url: "{{env.SLACK_WEBHOOK_URL}}"
+        headers:
+          - key: "Content-Type"
+            value: "application/json"
+        body:
+          type: "json"
+          data:
+            text: "🌡️ 센서 요약 ({{period}})"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "{{llm_summary}}"
+              - type: "divider"
+              - type: "context"
+                elements:
+                  - type: "mrkdwn"
+                    text: "이벤트: {{code_validate.event_count}}개"
+
+    - id: "http_telegram_summary"
+      type: "http_request"
+      title: "Telegram 발송"
+      position:
+        x: 600
+        y: 250
+      data:
+        method: "POST"
+        url: "https://api.telegram.org/bot{{env.TELEGRAM_BOT_TOKEN}}/sendMessage"
+        headers:
+          - key: "Content-Type"
+            value: "application/json"
+        body:
+          type: "json"
+          data:
+            chat_id: "{{env.TELEGRAM_CHAT_ID}}"
+            text: |
+              🌡️ 센서 요약 ({{period}})
+
+              {{llm_summary}}
+
+              이벤트: {{code_validate.event_count}}개
+
+    - id: "http_email_summary"
+      type: "http_request"
+      title: "Email 발송"
+      position:
+        x: 800
+        y: 250
+      data:
+        method: "POST"
+        url: "{{env.SMTP_SERVER_URL}}"
+        headers:
+          - key: "Content-Type"
+            value: "application/json"
+        body:
+          type: "json"
+          data:
+            to: "{{env.EMAIL_RECIPIENT}}"
+            subject: "[센서] 1분 요약 - {{period}}"
+            body: |
+              <html>
+              <body style="font-family: Arial; color: #333;">
+              <h2>센서 1분 요약</h2>
+              <p><strong>시간:</strong> {{period}}</p>
+              <p><strong>요약:</strong></p>
+              <pre>{{llm_summary}}</pre>
+              <p><strong>이벤트 수:</strong> {{code_validate.event_count}}</p>
+              </body>
+              </html>
+
+    - id: "end"
+      type: "end"
+      title: "종료"
+      position:
+        x: 700
+        y: 400
+      data:
+        output_type: "object"
+        output_schema:
+          type: "object"
+          properties:
+            status:
+              type: "string"
+            summary:
+              type: "string"
+            sent_count:
+              type: "number"
+
+  edges:
+    - source: "start"
+      target: "code_validate"
+    - source: "code_validate"
+      target: "llm_summary"
+    - source: "llm_summary"
+      target: "condition_alert"
+    - source: "condition_alert"
+      target: "http_slack_summary"
+      condition: "true"
+    - source: "condition_alert"
+      target: "http_slack_summary"
+      condition: "false"
+    - source: "http_slack_summary"
+      target: "http_telegram_summary"
+    - source: "http_telegram_summary"
+      target: "http_email_summary"
+    - source: "http_email_summary"
+      target: "end"
+
+# 환경 변수
+environment_variables:
+  - key: "SLACK_WEBHOOK_URL"
+    required: true
+    description: "Slack Incoming Webhook URL"
+  - key: "TELEGRAM_BOT_TOKEN"
+    required: true
+    description: "Telegram Bot API Token"
+  - key: "TELEGRAM_CHAT_ID"
+    required: true
+    description: "Telegram Chat ID"
+  - key: "SMTP_SERVER_URL"
+    required: false
+    description: "SMTP Server URL (optional)"
+  - key: "EMAIL_RECIPIENT"
+    required: false
+    description: "Email recipient address (optional)"

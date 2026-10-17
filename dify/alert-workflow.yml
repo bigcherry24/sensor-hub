@@ -1,0 +1,250 @@
+version: "0.1"
+kind: "workflow"
+metadata:
+  name: "Sensor Alert"
+  description: "센서 임계치 초과 시 긴급 경보"
+
+graph:
+  nodes:
+    - id: "start"
+      type: "start"
+      title: "시작"
+      position:
+        x: 100
+        y: 100
+      data:
+        variables:
+          - variable: "period"
+            type: "string"
+            required: true
+            description: "시간 (예: 2026-10-17 17:35)"
+          - variable: "events"
+            type: "object"
+            required: true
+            description: "센서 집계 데이터 배열"
+          - variable: "alert_type"
+            type: "string"
+            required: true
+            description: "경보 타입 (emergency)"
+
+    - id: "code_format_alert"
+      type: "code"
+      title: "경보 포맷팅"
+      position:
+        x: 300
+        y: 100
+      data:
+        language: "python3"
+        code: |
+          # 경보 메시지 포맷팅
+          import json
+          from datetime import datetime
+
+          alert_details = []
+
+          for event in events:
+              detail = {
+                  'device': event.get('device'),
+                  'sensor': event.get('sensor'),
+                  'max': float(event.get('max', 0)),
+                  'threshold': 30.0 if event.get('sensor') == 'temperature' else 5.0,
+                  'unit': '°C' if event.get('sensor') == 'temperature' else 'cm'
+              }
+              alert_details.append(detail)
+
+          # 경보 텍스트 생성
+          alert_text = "🚨 센서 경보 발생!\n\n"
+          for detail in alert_details:
+              alert_text += f"{detail['device']}/{detail['sensor']}: "
+              alert_text += f"{detail['max']}{detail['unit']} "
+              alert_text += f"(임계값: {detail['threshold']}{detail['unit']})\n"
+
+          result = {
+              'is_alert': True,
+              'alert_count': len(alert_details),
+              'alert_text': alert_text,
+              'details': alert_details,
+              'timestamp': datetime.utcnow().isoformat()
+          }
+
+    - id: "llm_alert"
+      type: "llm"
+      title: "LLM 경보 메시지"
+      position:
+        x: 500
+        y: 100
+      data:
+        model: "gpt-4"
+        temperature: 0.3
+        max_tokens: 300
+        system_prompt: |
+          당신은 긴급 상황 보고 담당자입니다.
+          센서 임계치 초과 상황을 명확하고 긴급하게 전달합니다.
+          메시지는 간결하고 강렬해야 합니다.
+          첫 줄은 항상 위험 상황을 강조합니다.
+        prompt: |
+          다음 센서 임계치 초과 상황을 긴급하게 보고하세요:
+
+          {{code_format_alert.alert_text}}
+
+          시간: {{period}}
+
+          형식:
+          🚨 [센서명] 경보!
+          - 현재값: [값]
+          - 임계값: [임계값]
+          - 권장조치: [조치]
+
+    - id: "http_slack_alert"
+      type: "http_request"
+      title: "Slack 긴급 알림"
+      position:
+        x: 300
+        y: 250
+      data:
+        method: "POST"
+        url: "{{env.SLACK_WEBHOOK_URL}}"
+        headers:
+          - key: "Content-Type"
+            value: "application/json"
+        body:
+          type: "json"
+          data:
+            text: "🚨 센서 경보 - {{period}}"
+            attachments:
+              - color: "#FF0000"
+                title: "🚨 센서 임계치 초과"
+                text: "{{llm_alert}}"
+                fields:
+                  - title: "경보 수"
+                    value: "{{code_format_alert.alert_count}}"
+                    short: true
+                  - title: "시간"
+                    value: "{{period}}"
+                    short: true
+                footer: "Sensor Hub Alert"
+                ts: "{{code_format_alert.timestamp}}"
+
+    - id: "http_telegram_alert"
+      type: "http_request"
+      title: "Telegram 긴급 알림"
+      position:
+        x: 500
+        y: 250
+      data:
+        method: "POST"
+        url: "https://api.telegram.org/bot{{env.TELEGRAM_BOT_TOKEN}}/sendMessage"
+        headers:
+          - key: "Content-Type"
+            value: "application/json"
+        body:
+          type: "json"
+          data:
+            chat_id: "{{env.TELEGRAM_CHAT_ID}}"
+            text: |
+              🚨🚨🚨 센서 긴급 경보 🚨🚨🚨
+
+              {{llm_alert}}
+
+              시간: {{period}}
+              경보 수: {{code_format_alert.alert_count}}개
+            parse_mode: "HTML"
+
+    - id: "http_email_alert"
+      type: "http_request"
+      title: "Email 긴급 알림"
+      position:
+        x: 700
+        y: 250
+      data:
+        method: "POST"
+        url: "{{env.SMTP_SERVER_URL}}"
+        headers:
+          - key: "Content-Type"
+            value: "application/json"
+        body:
+          type: "json"
+          data:
+            to: "{{env.EMAIL_RECIPIENT}}"
+            subject: "[긴급] 센서 임계치 초과 - {{period}}"
+            priority: "high"
+            body: |
+              <html>
+              <body style="font-family: Arial; color: #333;">
+              <div style="background-color: #ff0000; color: white; padding: 20px; border-radius: 5px;">
+                <h2 style="margin: 0;">🚨 센서 임계치 초과 경보</h2>
+              </div>
+
+              <p><strong style="color: #ff0000;">시간:</strong> {{period}}</p>
+              <p><strong style="color: #ff0000;">경보 수:</strong> {{code_format_alert.alert_count}}개</p>
+
+              <h3>상세:</h3>
+              <pre style="background-color: #f5f5f5; padding: 10px; border-radius: 5px;">{{llm_alert}}</pre>
+
+              <p><strong>권장조치:</strong></p>
+              <ul>
+              <li>센서 상태 확인</li>
+              <li>환경 조건 점검</li>
+              <li>필요시 경고 임계값 조정</li>
+              </ul>
+
+              <hr>
+              <p style="color: #999; font-size: 12px;">자동 생성된 경보 메시지입니다.</p>
+              </body>
+              </html>
+
+    - id: "end"
+      type: "end"
+      title: "종료"
+      position:
+        x: 500
+        y: 350
+      data:
+        output_type: "object"
+        output_schema:
+          type: "object"
+          properties:
+            status:
+              type: "string"
+            alert_message:
+              type: "string"
+            alert_count:
+              type: "number"
+            sent_timestamp:
+              type: "string"
+
+  edges:
+    - source: "start"
+      target: "code_format_alert"
+    - source: "code_format_alert"
+      target: "llm_alert"
+    - source: "llm_alert"
+      target: "http_slack_alert"
+    - source: "llm_alert"
+      target: "http_telegram_alert"
+    - source: "llm_alert"
+      target: "http_email_alert"
+    - source: "http_slack_alert"
+      target: "end"
+    - source: "http_telegram_alert"
+      target: "end"
+    - source: "http_email_alert"
+      target: "end"
+
+# 환경 변수
+environment_variables:
+  - key: "SLACK_WEBHOOK_URL"
+    required: true
+    description: "Slack Incoming Webhook URL"
+  - key: "TELEGRAM_BOT_TOKEN"
+    required: true
+    description: "Telegram Bot API Token"
+  - key: "TELEGRAM_CHAT_ID"
+    required: true
+    description: "Telegram Chat ID"
+  - key: "SMTP_SERVER_URL"
+    required: false
+    description: "SMTP Server URL (optional)"
+  - key: "EMAIL_RECIPIENT"
+    required: false
+    description: "Email recipient address (optional)"
