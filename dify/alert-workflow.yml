@@ -43,51 +43,44 @@ graph:
           - variable: "alert_type"
             required: true
         code: |
-          # 경보 메시지 포맷팅
           from datetime import datetime
 
-          # 변수 추출 (여러 방식 지원)
-          events_input = locals().get('events') or globals().get('events')
+          def main(period, events, alert_type):
+              # events 객체에서 배열 추출
+              if isinstance(events, dict) and 'items' in events:
+                  aggregations = events['items']
+              elif isinstance(events, list):
+                  aggregations = events
+              else:
+                  aggregations = []
 
-          if events_input is None:
-              # events를 찾지 못했으면 기본값 설정
-              events_input = {'items': [], 'count': 0, 'timestamp': ''}
+              alert_details = []
 
-          # events 객체에서 배열 추출
-          if isinstance(events_input, dict) and 'items' in events_input:
-              aggregations = events_input['items']
-          elif isinstance(events_input, list):
-              aggregations = events_input
-          else:
-              aggregations = []
+              for event in aggregations:
+                  if isinstance(event, dict):
+                      detail = {
+                          'device': event.get('device'),
+                          'sensor': event.get('sensor'),
+                          'max': float(event.get('max', 0)),
+                          'threshold': 30.0 if event.get('sensor') == 'temperature' else 5.0,
+                          'unit': '°C' if event.get('sensor') == 'temperature' else 'cm'
+                      }
+                      alert_details.append(detail)
 
-          alert_details = []
+              # 경보 텍스트 생성
+              alert_text = "🚨 센서 경보 발생!\n\n"
+              for detail in alert_details:
+                  alert_text += f"{detail['device']}/{detail['sensor']}: "
+                  alert_text += f"{detail['max']}{detail['unit']} "
+                  alert_text += f"(임계값: {detail['threshold']}{detail['unit']})\n"
 
-          for event in aggregations:
-              if isinstance(event, dict):
-                  detail = {
-                      'device': event.get('device'),
-                      'sensor': event.get('sensor'),
-                      'max': float(event.get('max', 0)),
-                      'threshold': 30.0 if event.get('sensor') == 'temperature' else 5.0,
-                      'unit': '°C' if event.get('sensor') == 'temperature' else 'cm'
-                  }
-                  alert_details.append(detail)
-
-          # 경보 텍스트 생성
-          alert_text = "🚨 센서 경보 발생!\n\n"
-          for detail in alert_details:
-              alert_text += f"{detail['device']}/{detail['sensor']}: "
-              alert_text += f"{detail['max']}{detail['unit']} "
-              alert_text += f"(임계값: {detail['threshold']}{detail['unit']})\n"
-
-          result = {
-              'is_alert': True,
-              'alert_count': len(alert_details),
-              'alert_text': alert_text,
-              'details': alert_details,
-              'timestamp': datetime.utcnow().isoformat()
-          }
+              return {
+                  'is_alert': True,
+                  'alert_count': len(alert_details),
+                  'alert_text': alert_text,
+                  'details': alert_details,
+                  'timestamp': datetime.utcnow().isoformat()
+              }
 
     - id: "llm_alert"
       type: "llm"
