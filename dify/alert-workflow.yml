@@ -75,11 +75,13 @@ graph:
                   alert_text += f"(임계값: {detail['threshold']}{detail['unit']})\n"
 
               return {
-                  'is_alert': True,
-                  'alert_count': len(alert_details),
-                  'alert_text': alert_text,
-                  'details': alert_details,
-                  'timestamp': datetime.utcnow().isoformat()
+                  "result": {
+                      'is_alert': True,
+                      'alert_count': len(alert_details),
+                      'alert_text': alert_text,
+                      'details': alert_details,
+                      'timestamp': datetime.utcnow().isoformat()
+                  }
               }
 
     - id: "llm_alert"

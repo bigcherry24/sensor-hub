@@ -74,10 +74,12 @@ graph:
                   summary_text += f"avg={event['avg']:.1f}, changes={event['change_count']}\n"
 
               return {
-                  'validated': True,
-                  'event_count': len(validated_events),
-                  'summary_text': summary_text,
-                  'events': validated_events
+                  "result": {
+                      'validated': True,
+                      'event_count': len(validated_events),
+                      'summary_text': summary_text,
+                      'events': validated_events
+                  }
               }
 
     - id: "llm_summary"
