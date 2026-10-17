@@ -21,7 +21,7 @@ graph:
           - variable: "events"
             type: "object"
             required: true
-            description: "센서 집계 데이터 배열"
+            description: "센서 집계 데이터 배열 (JSON array format)"
           - variable: "alert_type"
             type: "string"
             required: false

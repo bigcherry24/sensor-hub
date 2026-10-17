@@ -58,15 +58,31 @@ SMTP 서버: smtp.gmail.com
 5. "Create" 클릭
 ```
 
-### 1-2. 입력 변수 설정
+### 1-2. 입력 변수 설정 (User Input 노드)
 
 **Start 노드 클릭 → Variables 추가:**
 
-| 변수명 | 타입 | 필수 | 설명 |
-|---|---|---|---|
-| period | String | Yes | 시간 (예: 2026-10-17 17:35) |
-| events | Array[Object] | Yes | 센서 집계 배열 |
-| alert_type | String | No | 경보 타입 |
+| 변수명 | 타입 | 필수 | 설명 | 입력 방식 |
+|---|---|---|---|---|
+| period | String | Yes | 시간 (예: 2026-10-17 17:35) | 텍스트 입력 |
+| events | Object | Yes | 센서 집계 데이터 배열 | **JSON code field** |
+| alert_type | String | No | 경보 타입 (summary/emergency) | 텍스트 입력 |
+
+**주의:** `events`는 Object 타입이므로 **JSON code input field**로 나타납니다.
+Bridge.py에서 JSON 배열 형식으로 전송합니다:
+```json
+[
+  {
+    "device": "raspberrypi",
+    "sensor": "temperature",
+    "min": 24.1,
+    "max": 24.8,
+    "avg": 24.5,
+    "change_count": 2,
+    "sample_count": 10
+  }
+]
+```
 
 ### 1-3. 노드 추가
 
@@ -227,7 +243,15 @@ EMAIL_RECIPIENT: (선택)
 
 ## 🔧 Step 2: Sensor Alert 워크플로우 생성
 
-### 2-1 ~ 2-6: 동일한 절차
+### 2-1 ~ 2-6: Step 1과 동일한 절차
+
+**1-2 입력 변수 설정 (동일):**
+
+| 변수명 | 타입 | 필수 | 입력 방식 |
+|---|---|---|---|
+| period | String | Yes | 텍스트 입력 |
+| events | Object | Yes | **JSON code field** |
+| alert_type | String | Yes | 텍스트 입력 |
 
 **차이점:**
 - 앱 이름: "Sensor Alert"
